@@ -1,9 +1,8 @@
 package com.example.yamaguchi.tokikake;
 
-import android.util.Log;
-
 import com.example.yamaguchi.tokikake.Deferred.Result;
 
+import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
@@ -44,15 +43,17 @@ public class Deferred<RE extends Result> {
         return this;
     }
 
-    public static class Promise<RE extends Result> {
+//    public Deferred<RE> notify(RE result) {
+//        this.promise().notify(result);
+//        return this;
+//    }
 
-        Runnable pendingTask;
+    public static class Promise<RE extends Result> {
 
         private enum State {
             Fulfilled,
             Rejected,
-            Pending,
-            Cancelled;
+            Pending
         }
 
         RE mResult;
@@ -62,6 +63,9 @@ public class Deferred<RE extends Result> {
         public boolean fulfilled() { return mState == State.Fulfilled; }
         public boolean rejected() { return mState == State.Rejected; }
         public boolean pending() { return mState == State.Pending; }
+        
+        private ArrayList<Runnable> mPendingTaskList = new ArrayList<>();
+        private ArrayList<Runnable> mProgressTaskList = new ArrayList<>();
 
         private void fulfill(final RE result) {
             mExecutor.submit(new Runnable() {
@@ -73,10 +77,10 @@ public class Deferred<RE extends Result> {
                     mResult = result;
                     mState = State.Fulfilled;
 
-                    if (pendingTask != null) {
-                        mExecutor.submit(pendingTask);
-                        pendingTask = null;
+                    for (Runnable task : mPendingTaskList) {
+                        mExecutor.submit(task);
                     }
+                    mPendingTaskList.clear();
                 }
             });
             
@@ -92,9 +96,24 @@ public class Deferred<RE extends Result> {
                     mResult = result;
                     mState = State.Rejected;
 
-                    if (pendingTask != null) {
-                        mExecutor.submit(pendingTask);
-                        pendingTask = null;
+                    for (Runnable task : mPendingTaskList) {
+                        mExecutor.submit(task);
+                    }
+                    mPendingTaskList.clear();
+                }
+            });
+        }
+
+        private void  notify(final RE result) {
+            mExecutor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    if (!pending()) {
+                        return;
+                    }
+
+                    for (Runnable task : mProgressTaskList) {
+                        mExecutor.submit(task);
                     }
                 }
             });
@@ -105,7 +124,7 @@ public class Deferred<RE extends Result> {
                 @Override
                 public void run() {
                     if (pending()) {
-                        pendingTask = task;
+                        mPendingTaskList.add(task);
                         return;
                     }
                     mExecutor.submit(task);
@@ -113,10 +132,9 @@ public class Deferred<RE extends Result> {
             });
         }
 
-        // MARK: Done
+        // Done
 
         public Promise done(final FutureTask<RE> futureTask) {
-            Log.d("LOG", "done");
             handle(new Runnable() {
                 @Override
                 public void run() {
@@ -129,11 +147,9 @@ public class Deferred<RE extends Result> {
             return this;
         }
 
-        // MARK: Fail
+        // Fail
 
         public Promise fail(final FutureTask<RE> futureTask) {
-            Log.d("LOG", "fail");
-            final Deferred<RE> deferred = new Deferred<RE>();
             handle(new Runnable() {
                 @Override
                 public void run() {
@@ -143,6 +159,31 @@ public class Deferred<RE extends Result> {
                 }
             });
             
+            return this;
+        }
+        
+        // Progress
+        
+        public Promise progress(final FutureTask<RE> futureTask) {
+            handle(new Runnable() {
+                @Override
+                public void run() {
+                    mExecutor.submit(futureTask);
+                }
+            });
+
+            return this;
+        }
+
+        // Always
+
+        public Promise always(final FutureTask<RE> futureTask) {
+            handle(new Runnable() {
+                @Override
+                public void run() {
+                    mExecutor.submit(futureTask);
+                }
+            });
             return this;
         }
     }
