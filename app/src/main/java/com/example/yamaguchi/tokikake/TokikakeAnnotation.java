@@ -1,7 +1,5 @@
 package com.example.yamaguchi.tokikake;
 
-import android.util.Log;
-
 import com.example.yamaguchi.tokikake.Deferred.Result;
 
 import java.lang.annotation.ElementType;
@@ -17,7 +15,7 @@ public class TokikakeAnnotation {
 
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
-    public static @interface MyAnnotation {
+    public static @interface Tokikake {
         public String value();
     }
 
@@ -38,10 +36,9 @@ public class TokikakeAnnotation {
 
                 String name = m.getName();
 
-                if (m.getAnnotation(MyAnnotation.class) != null) {
-                    MyAnnotation element =
-                            m.getAnnotation(MyAnnotation.class);
-                    Log.d("TAG", element.value());
+                if (m.getAnnotation(Tokikake.class) != null) {
+                    Tokikake element =
+                            m.getAnnotation(Tokikake.class);
 
                     if (element.value().equals(value)) {
                         method = m;
