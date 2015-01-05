@@ -5,7 +5,10 @@ import android.os.Bundle;
 import android.util.Log;
 
 import com.example.yamaguchi.tokikake.Deferred.Result;
+import com.example.yamaguchi.tokikake.TokikakeAnnotation.MyAnnotation;
+import com.example.yamaguchi.tokikake.TokikakeAnnotation.ReflectionUtil;
 
+import java.lang.reflect.Method;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -33,19 +36,6 @@ public class MainActivity extends Activity {
             }
         };
 
-        // コールバックを登録
-        FutureTask<Result<String, String, String>> myTask2 = new FutureTask<Result<String, String, String>>(heavy2) {
-            @Override protected void done() {
-                try {
-                    Log.d("LOG", this.get().mValue);
-                } catch (ExecutionException e) {
-                    e.printStackTrace();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        };
-
         final Deferred deferred = new Deferred<Result<String, String, String>>();
         deferred.mExecutor.submit(new Runnable() {
             @Override
@@ -54,10 +44,13 @@ public class MainActivity extends Activity {
                 deferred.reject(new Result<String, String, String>("", "ng", ""));
             }
         });
+        
+        TaskFactory<Result<String, String ,String >> taskFactory = new TaskFactory<>();
+        final Method method = ReflectionUtil.getMethod(MainActivity.this, "test");
 
         deferred.promise()
-                .done(myTask2)
-                .fail(mMyTask1);
+                .done(mMyTask1)
+                .fail(taskFactory.createTask(MainActivity.this, method, heavy2));
 
     }
 
@@ -79,4 +72,9 @@ public class MainActivity extends Activity {
                     }
                 }
             };
+    
+    @MyAnnotation("test")
+    private void TestMethod() {
+        Log.d("LOG","testMethod");
+    }
 }
